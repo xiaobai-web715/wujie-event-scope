@@ -1,0 +1,2 @@
+# wujieEventScope
+处理子应用HTML事件window指向主应用导致undefined的问题
