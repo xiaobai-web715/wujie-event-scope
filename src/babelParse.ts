@@ -1,62 +1,85 @@
-import { parse } from "@babel/parser"
-import traverse from "@babel/traverse"
+import * as acorn from "acorn";
+import * as walk from "acorn-walk";
 
 export interface AstInfo {
-    ast: string, // 目标字符
-    start: number, // 开始偏移量
-    end: number, // 结束偏移量
+  ast: string; // 目标字符
+  start: number; // 开始偏移量
+  end: number; // 结束偏移量
 }
-function getMemberExpressionPath(path: any): string {
-    const object = path.get('object');
-    const property = path.get('property');
-    return `${object.isMemberExpression() ? getMemberExpressionPath(object) : object.node.name}.${property.isMemberExpression() ? getMemberExpressionPath(property) : property.node.name}`
+
+function getMemberExpressionPath(node: any): string {
+  const object = node.object;
+  const property = node.property;
+
+  const objectName =
+    object && object.type === "MemberExpression"
+      ? getMemberExpressionPath(object)
+      : object?.name;
+
+  const propertyName =
+    property && property.type === "MemberExpression"
+      ? getMemberExpressionPath(property)
+      : property?.name ?? property?.value ?? "";
+
+  return `${objectName}.${propertyName}`;
 }
 
 export function findIdentifiers(code: string) {
-    const results = new Set<AstInfo>();
-    const ast = parse(code, {
-        sourceType: 'module'
-    });
-    // @ts-ignore
-    (traverse.default ? traverse.default : traverse)(ast, {
-        CallExpression(path: any) {
-            const callee = path.get('callee');
-            if (callee.isIdentifier()) {
-                results.add({
-                    ast: callee.node.name,
-                    start: callee.node.start,
-                    end: callee.node.end
-                });
-            }
-            if (callee.isMemberExpression()) {
-                const memberName = getMemberExpressionPath(callee);
-                results.add({
-                    ast: memberName,
-                    start: callee.node.start,
-                    end: callee.node.end
-                });
-            }
-        },
-        AssignmentExpression(path: any) {
-            const left = path.get('left');
-            if (left.isIdentifier()) {
-                results.add({
-                    ast: left.node.name,
-                    start: left.node.start,
-                    end: left.node.end
-                }); // d
-            }
-        
-            if (left.isMemberExpression()) {
-                const memberName = getMemberExpressionPath(left);
-                results.add({
-                    ast: memberName,
-                    start: left.node.start,
-                    end: left.node.end
-                });
-            }
-        }
-    })
+  const results = new Set<AstInfo>();
 
-    return Array.from(results);
+  const ast = acorn.parse(code, {
+    ecmaVersion: "latest",
+    sourceType: "module",
+    locations: false,
+    ranges: true,
+  }) as any;
+
+  walk.simple(ast, {
+    CallExpression(node: any) {
+      const callee = node.callee;
+
+      if (!callee) return;
+
+      if (callee.type === "Identifier") {
+        results.add({
+          ast: callee.name,
+          start: callee.start,
+          end: callee.end,
+        });
+      }
+
+      if (callee.type === "MemberExpression") {
+        const memberName = getMemberExpressionPath(callee);
+        results.add({
+          ast: memberName,
+          start: callee.start,
+          end: callee.end,
+        });
+      }
+    },
+    AssignmentExpression(node: any) {
+      const left = node.left;
+
+      if (!left) return;
+
+      if (left.type === "Identifier") {
+        results.add({
+          ast: left.name,
+          start: left.start,
+          end: left.end,
+        });
+      }
+
+      if (left.type === "MemberExpression") {
+        const memberName = getMemberExpressionPath(left);
+        results.add({
+          ast: memberName,
+          start: left.start,
+          end: left.end,
+        });
+      }
+    },
+  });
+
+  return Array.from(results);
 }
