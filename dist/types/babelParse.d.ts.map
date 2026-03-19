@@ -1,0 +1,1 @@
+{"version":3,"file":"babelParse.d.ts","sourceRoot":"","sources":["../../src/babelParse.ts"],"names":[],"mappings":"AAGA,MAAM,WAAW,OAAO;IACpB,GAAG,EAAE,MAAM,CAAC;IACZ,KAAK,EAAE,MAAM,CAAC;IACd,GAAG,EAAE,MAAM,CAAC;CACf;AAOD,wBAAgB,eAAe,CAAC,IAAI,EAAE,MAAM,aA+C3C"}
