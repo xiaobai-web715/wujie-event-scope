@@ -1,18 +1,24 @@
-import { fnNameRegx, fnBody } from "./regx"
+import { fnBody } from "./regx"
+import { findIdentifiers } from "./babelParse"
 function patchElementHook(element: HTMLElement, window: Window) {
     const originHTMLClickEvent = element.onclick;
     if (typeof originHTMLClickEvent === 'function') {
         const originHTMLClickEventStr = originHTMLClickEvent.toString();
-        console.log("===处理前信息", originHTMLClickEventStr)
-        const replaceOriginHTMLClickEventStr = originHTMLClickEventStr.replace(fnNameRegx, (str) => {
-            if (str.indexOf("window") > -1 || str.indexOf('onclick') > -1) {
-                return str
-            } else {
-                return `window.${str}`
+        console.log("====事件函数原字符", originHTMLClickEventStr)
+        const targetAttrLists = findIdentifiers(originHTMLClickEventStr);
+        let lastSliceEnd = 0;
+        let replaceHTMLClickEventStr: string = '';
+        targetAttrLists.forEach(astInfo => {
+            const { ast, start, end } = astInfo
+            if (!ast.includes('window')) {
+                replaceHTMLClickEventStr += `${originHTMLClickEventStr.slice(lastSliceEnd, start)}window.${ast}`
+                lastSliceEnd = end
             }
-        });
-        console.log("===处理后信息", replaceOriginHTMLClickEventStr)
-        const fnBodyStr = replaceOriginHTMLClickEventStr.match(fnBody)?.[1];
+        })
+        replaceHTMLClickEventStr += `${originHTMLClickEventStr.slice(lastSliceEnd)}`
+        console.log("====事件函数处理后字符", replaceHTMLClickEventStr)
+        const fnBodyStr = replaceHTMLClickEventStr.match(fnBody)?.[1];
+        console.log("====匹配后字符", fnBodyStr)
         if (fnBodyStr) {
             element.onclick = (function (window) {
                 return function (event) {
