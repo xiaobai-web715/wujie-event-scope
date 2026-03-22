@@ -3,6 +3,10 @@ import { targetToLNU } from "./utils"
 import { findIdentifiers, findDeclarationIdentifiers } from "./babelParse"
 import elementDataStore from "./elementDataStore"
 
+interface IpatchInlineCodeHook {
+    code: string
+}
+
 function dealAttributesOCPatch(targetString: string) {
     const targetAttrLists = findIdentifiers(targetString);
     let lastSliceEnd = 0;
@@ -71,10 +75,10 @@ function patchElementHook(element: HTMLElement, targetWindow: Window) {
     }
 }
 
-function patchInlineCodeHook(code: string, targetWindow: Window) {
-    const result = findDeclarationIdentifiers(code)
+function patchInlineCodeHook(target: IpatchInlineCodeHook, targetWindow: Window) {
+    const result = findDeclarationIdentifiers(target.code)
     console.log("===处理后的信息", result)
-    return result
+    target.code = result
 }
 
 export default {

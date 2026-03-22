@@ -6842,10 +6842,10 @@ function patchElementHook(element, targetWindow) {
         // console.log("===替换之后的结果", element.getAttribute('onclick'))
     }
 }
-function patchInlineCodeHook(code, targetWindow) {
-    const result = findDeclarationIdentifiers(code);
+function patchInlineCodeHook(target, targetWindow) {
+    const result = findDeclarationIdentifiers(target.code);
     console.log("===处理后的信息", result);
-    return result;
+    target.code = result;
 }
 var index = {
     patchElementHook,
