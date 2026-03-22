@@ -6705,9 +6705,10 @@ function dealHTMLOCPatch(targetString) {
     return fnBodyStr || '';
 }
 function patchElementHook(element) {
+    const targetHaveGetAttribute = typeof element.getAttribute === 'function';
     const originHTMLClickEvent = element.onclick;
-    const originAttributeEventStr = element.getAttribute('onclick');
-    if (element.getAttribute('data-test-scope')) {
+    const originAttributeEventStr = targetHaveGetAttribute ? element.getAttribute('onclick') : '';
+    if (targetHaveGetAttribute && element.getAttribute('data-test-scope')) {
         // @ts-ignore
         console.log('===子应用window', window.__WUJIE.proxy);
         console.log('===HTML事件绑定', originHTMLClickEvent);
