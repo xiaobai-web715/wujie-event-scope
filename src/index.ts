@@ -56,7 +56,7 @@ function patchElementHook(element: HTMLElement, targetWindow: Window) {
         const haveRegister = elementDataStore.hasStoreData(targetWindow)
         if(!haveRegister) {
             // @ts-ignore
-            const currentWujieName = targetWindow.__WUJIE.name
+            const currentWujieName = targetWindow.__WUJIE.id
             const targetWindowPath = `__WUJIE_${targetToLNU(currentWujieName)}`
             console.log("===存储路径", targetWindowPath)
             // @ts-ignore
