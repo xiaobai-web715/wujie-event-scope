@@ -4,7 +4,8 @@ import { findIdentifiers, findDeclarationIdentifiers } from "./babelParse"
 import elementDataStore from "./elementDataStore"
 
 interface IpatchInlineCodeHook {
-    code: string
+    code: string,
+    patch: boolean,
 }
 
 function dealAttributesOCPatch(targetString: string) {
@@ -79,6 +80,7 @@ function patchInlineCodeHook(target: IpatchInlineCodeHook, targetWindow: Window)
     const result = findDeclarationIdentifiers(target.code)
     console.log("===处理后的信息", result)
     target.code = result
+    target.patch = true
 }
 
 export default {

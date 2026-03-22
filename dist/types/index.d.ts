@@ -1,5 +1,6 @@
 interface IpatchInlineCodeHook {
     code: string;
+    patch: boolean;
 }
 declare function patchElementHook(element: HTMLElement, targetWindow: Window): void;
 declare function patchInlineCodeHook(target: IpatchInlineCodeHook, targetWindow: Window): void;

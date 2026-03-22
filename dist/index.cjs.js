@@ -6848,6 +6848,7 @@ function patchInlineCodeHook(target, targetWindow) {
     const result = findDeclarationIdentifiers(target.code);
     console.log("===处理后的信息", result);
     target.code = result;
+    target.patch = true;
 }
 var index = {
     patchElementHook,
