@@ -1,7 +1,7 @@
 {
   "type": "module",
   "name": "wujie-event-scope",
-  "version": "1.0.2",
+  "version": "1.0.4",
   "description": "处理wujie子应用HTML事件执行undefined问题",
   "main": "dist/index.cjs.js",
   "module": "dist/index.es.js",

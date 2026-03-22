@@ -1,1 +1,1 @@
-{"version":3,"file":"babelParse.d.ts","sourceRoot":"","sources":["../../src/babelParse.ts"],"names":[],"mappings":"AAGA,MAAM,WAAW,OAAO;IACtB,GAAG,EAAE,MAAM,CAAC;IACZ,KAAK,EAAE,MAAM,CAAC;IACd,GAAG,EAAE,MAAM,CAAC;CACb;AAmBD,wBAAgB,eAAe,CAAC,IAAI,EAAE,MAAM,aA0D3C"}
+{"version":3,"file":"babelParse.d.ts","sourceRoot":"","sources":["../../src/babelParse.ts"],"names":[],"mappings":"AAGA,MAAM,WAAW,OAAO;IACtB,GAAG,EAAE,MAAM,CAAC;IACZ,KAAK,EAAE,MAAM,CAAC;IACd,GAAG,EAAE,MAAM,CAAC;CACb;AA0CD,wBAAgB,eAAe,CAAC,IAAI,EAAE,MAAM,aA6E3C"}

@@ -1,32 +1,61 @@
 import { fnBody } from "./regx"
 import { findIdentifiers } from "./babelParse"
-function patchElementHook(element: HTMLElement, window: Window) {
-    const originHTMLClickEvent = element.onclick;
-    if (typeof originHTMLClickEvent === 'function') {
-        const originHTMLClickEventStr = originHTMLClickEvent.toString();
-        console.log("====事件函数原字符", originHTMLClickEventStr)
-        const targetAttrLists = findIdentifiers(originHTMLClickEventStr);
+
+function dealAttributesOCPatch(targetString: string) {
+    const targetAttrLists = findIdentifiers(targetString);
+    let lastSliceEnd = 0;
+    let replaceAttributeEventStr: string = '';
+    targetAttrLists.forEach(astInfo => {
+        const { ast, start, end } = astInfo
+        if (!ast.includes('window')) {
+            replaceAttributeEventStr += `${targetString.slice(lastSliceEnd, start)}window.${ast}`
+            lastSliceEnd = end
+        }
+    })
+    replaceAttributeEventStr += `${targetString.slice(lastSliceEnd)}`
+    console.log("====事件函数处理后字符", replaceAttributeEventStr)
+    return replaceAttributeEventStr
+}
+
+function dealHTMLOCPatch(targetString: string) {
+        console.log("====事件函数原字符", targetString)
+        const targetAttrLists = findIdentifiers(targetString);
         let lastSliceEnd = 0;
         let replaceHTMLClickEventStr: string = '';
         targetAttrLists.forEach(astInfo => {
             const { ast, start, end } = astInfo
             if (!ast.includes('window')) {
-                replaceHTMLClickEventStr += `${originHTMLClickEventStr.slice(lastSliceEnd, start)}window.${ast}`
+                replaceHTMLClickEventStr += `${targetString.slice(lastSliceEnd, start)}window.${ast}`
                 lastSliceEnd = end
             }
         })
-        replaceHTMLClickEventStr += `${originHTMLClickEventStr.slice(lastSliceEnd)}`
+        replaceHTMLClickEventStr += `${targetString.slice(lastSliceEnd)}`
         console.log("====事件函数处理后字符", replaceHTMLClickEventStr)
         const fnBodyStr = replaceHTMLClickEventStr.match(fnBody)?.[1];
-        console.log("====匹配后字符", fnBodyStr)
-        if (fnBodyStr) {
-            element.onclick = (function (window) {
-                return function (event) {
-                    const fn = new Function(fnBodyStr);
-                    fn.call(this);
-                }
-            })(window)
-        }
+        return fnBodyStr || ''
+}
+
+function patchElementHook(element: HTMLElement) {
+    const originHTMLClickEvent = element.onclick;
+    const originAttributeEventStr = element.getAttribute('onclick')
+    if (element.getAttribute('data-test-scope')) {
+        // @ts-ignore
+        console.log('===子应用window', window.__WUJIE.proxy)
+        console.log('===HTML事件绑定', originHTMLClickEvent)
+        console.log('===attribute获取事件', originAttributeEventStr)
+    }
+    let result = '';
+    if (originAttributeEventStr) {
+        result = dealAttributesOCPatch(originAttributeEventStr)
+    } else if (typeof originHTMLClickEvent === 'function') {
+        result = dealHTMLOCPatch(originHTMLClickEvent.toString())
+    }
+    if (result) {
+        console.log("====执行字符串", result)
+        element.setAttribute('onclick', `(function(window) {
+            ${result}
+        })(window.__WUJIE.proxy)`)
+        console.log("===替换之后的结果", element.getAttribute('onclick'))
     }
 }
 

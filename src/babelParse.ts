@@ -24,6 +24,29 @@ function getMemberExpressionPath(node: any): string {
   return `${objectName}.${propertyName}`;
 }
 
+function getCallExpression(node: any, args: any, results: Set<AstInfo>) {
+  if (node.type === "Identifier") { 
+    results.add({
+      ast: node.name,
+      start: node.start,
+      end: node.end,
+    });
+    if (Array.isArray(args) && args.length > 0) {
+      args.forEach((node: any) => {
+        getCallExpression(node, node.arguments ,results)
+      })
+    }
+  } else if (node.type === 'MemberExpression') {
+    const memberName = getMemberExpressionPath(node);
+    results.add({
+      ast: memberName,
+      start: node.start,
+      end: node.end,
+    });
+  }
+  return results
+}
+
 export function findIdentifiers(code: string) {
   const results = new Set<AstInfo>();
 
@@ -40,22 +63,41 @@ export function findIdentifiers(code: string) {
 
       if (!callee) return;
 
-      if (callee.type === "Identifier") {
-        results.add({
-          ast: callee.name,
-          start: callee.start,
-          end: callee.end,
-        });
-      }
+      getCallExpression(callee, node.arguments, results)
+      // if (callee.type === "Identifier") {
+      //   results.add({
+      //     ast: callee.name,
+      //     start: callee.start,
+      //     end: callee.end,
+      //   });
+      //   if (Array.isArray(node.arguments) && node.arguments.length > 0) {
+      //     node.arguments.forEach((node: any) => {
+      //       if (node.type === 'Identifier') {
+      //         results.add({
+      //           ast: node.name,
+      //           start: node.start,
+      //           end: node.end,
+      //         });
+      //       } else if (node.type === 'MemberExpression') {
+      //         const memberName = getMemberExpressionPath(callee);
+      //         results.add({
+      //           ast: memberName,
+      //           start: node.start,
+      //           end: node.end,
+      //         });
+      //       }
+      //     })
+      //   }
+      // }
 
-      if (callee.type === "MemberExpression") {
-        const memberName = getMemberExpressionPath(callee);
-        results.add({
-          ast: memberName,
-          start: callee.start,
-          end: callee.end,
-        });
-      }
+      // if (callee.type === "MemberExpression") {
+      //   const memberName = getMemberExpressionPath(callee);
+      //   results.add({
+      //     ast: memberName,
+      //     start: callee.start,
+      //     end: callee.end,
+      //   });
+      // }
     },
     AssignmentExpression(node: any) {
       const left = node.left;
@@ -81,5 +123,5 @@ export function findIdentifiers(code: string) {
     },
   });
 
-  return Array.from(results);
+  return Array.from(results).sort((a, b) => a.start - b.start);
 }
