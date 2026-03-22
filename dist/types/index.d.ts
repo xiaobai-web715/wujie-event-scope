@@ -1,4 +1,4 @@
-declare function patchElementHook(element: HTMLElement): void;
+declare function patchElementHook(element: HTMLElement, targetWindow: Window): void;
 declare const _default: {
     patchElementHook: typeof patchElementHook;
 };

@@ -1,6 +1,11 @@
 'use strict';
 
 const fnBody = /function[^\(]*\([^\)]*\)[^\{]*\{([\s\S]*?)\}$/;
+const onlyLettersAndNumbers = /[^0-9a-zA-Z]/g;
+
+const targetToLNU = (string) => {
+    return string.replace(onlyLettersAndNumbers, '').toUpperCase();
+};
 
 // This file was generated. Do not modify manually!
 var astralIdentifierCodes = [509, 0, 227, 0, 150, 4, 294, 9, 1368, 2, 2, 1, 6, 3, 41, 2, 5, 0, 166, 1, 574, 3, 9, 9, 7, 9, 32, 4, 318, 1, 78, 5, 71, 10, 50, 3, 123, 2, 54, 14, 32, 10, 3, 1, 11, 3, 46, 10, 8, 0, 46, 9, 7, 2, 37, 13, 2, 9, 6, 1, 45, 0, 13, 2, 49, 13, 9, 3, 2, 11, 83, 11, 7, 0, 3, 0, 158, 11, 6, 9, 7, 3, 56, 1, 2, 6, 3, 1, 3, 2, 10, 0, 11, 1, 3, 6, 4, 4, 68, 8, 2, 0, 3, 0, 2, 3, 2, 4, 2, 0, 15, 1, 83, 17, 10, 9, 5, 0, 82, 19, 13, 9, 214, 6, 3, 8, 28, 1, 83, 16, 16, 9, 82, 12, 9, 9, 7, 19, 58, 14, 5, 9, 243, 14, 166, 9, 71, 5, 2, 1, 3, 3, 2, 0, 2, 1, 13, 9, 120, 6, 3, 6, 4, 0, 29, 9, 41, 6, 2, 3, 9, 0, 10, 10, 47, 15, 199, 7, 137, 9, 54, 7, 2, 7, 17, 9, 57, 21, 2, 13, 123, 5, 4, 0, 2, 1, 2, 6, 2, 0, 9, 9, 49, 4, 2, 1, 2, 4, 9, 9, 55, 9, 266, 3, 10, 1, 2, 0, 49, 6, 4, 4, 14, 10, 5350, 0, 7, 14, 11465, 27, 2343, 9, 87, 9, 39, 4, 60, 6, 26, 9, 535, 9, 470, 0, 2, 54, 8, 3, 82, 0, 12, 1, 19628, 1, 4178, 9, 519, 45, 3, 22, 543, 4, 4, 5, 9, 7, 3, 6, 31, 3, 149, 2, 1418, 49, 513, 54, 5, 49, 9, 0, 15, 0, 23, 4, 2, 14, 1361, 6, 2, 16, 3, 6, 2, 1, 2, 4, 101, 0, 161, 6, 10, 9, 357, 0, 62, 13, 499, 13, 245, 1, 2, 9, 233, 0, 3, 0, 8, 1, 6, 0, 475, 6, 110, 6, 6, 9, 4759, 9, 787719, 239];
@@ -6672,6 +6677,23 @@ function findIdentifiers(code) {
     return Array.from(results).sort((a, b) => a.start - b.start);
 }
 
+const store = new WeakMap();
+function setStoreData(window, path) {
+    store.set(window, path);
+}
+function getStoreData(window) {
+    return store.get(window);
+}
+function hasStoreData(window) {
+    return store.has(window);
+}
+var elementDataStore = {
+    store,
+    setStoreData,
+    getStoreData,
+    hasStoreData
+};
+
 function dealAttributesOCPatch(targetString) {
     const targetAttrLists = findIdentifiers(targetString);
     let lastSliceEnd = 0;
@@ -6704,7 +6726,7 @@ function dealHTMLOCPatch(targetString) {
     const fnBodyStr = replaceHTMLClickEventStr.match(fnBody)?.[1];
     return fnBodyStr || '';
 }
-function patchElementHook(element) {
+function patchElementHook(element, targetWindow) {
     const targetHaveGetAttribute = typeof element.getAttribute === 'function';
     const originHTMLClickEvent = element.onclick;
     const originAttributeEventStr = targetHaveGetAttribute ? element.getAttribute('onclick') : '';
@@ -6721,9 +6743,20 @@ function patchElementHook(element) {
     }
     if (result) {
         console.log("====执行字符串", result);
+        const haveRegister = elementDataStore.hasStoreData(targetWindow);
+        if (!haveRegister) {
+            // @ts-ignore
+            const currentWujieName = targetWindow.__WUJIE.name;
+            const targetWindowPath = `__WUJIE_${targetToLNU(currentWujieName)}`;
+            console.log("===存储路径", targetWindowPath);
+            // @ts-ignore
+            window[targetWindowPath] = targetWindow;
+            elementDataStore.setStoreData(targetWindow, targetWindowPath);
+        }
+        const targetWindowPath = elementDataStore.getStoreData(targetWindow);
         element.setAttribute('onclick', `(function(window) {
             ${result}
-        })(window.__WUJIE.proxy)`);
+        })(window.${targetWindowPath})`);
         console.log("===替换之后的结果", element.getAttribute('onclick'));
     }
 }

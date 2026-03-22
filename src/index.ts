@@ -1,5 +1,7 @@
 import { fnBody } from "./regx"
+import { targetToLNU } from "./utils"
 import { findIdentifiers } from "./babelParse"
+import elementDataStore from "./elementDataStore"
 
 function dealAttributesOCPatch(targetString: string) {
     const targetAttrLists = findIdentifiers(targetString);
@@ -35,7 +37,7 @@ function dealHTMLOCPatch(targetString: string) {
         return fnBodyStr || ''
 }
 
-function patchElementHook(element: HTMLElement) {
+function patchElementHook(element: HTMLElement, targetWindow: Window) {
     const targetHaveGetAttribute = typeof element.getAttribute === 'function'
     const originHTMLClickEvent = element.onclick;
     const originAttributeEventStr = targetHaveGetAttribute ? element.getAttribute('onclick') : ''
@@ -51,9 +53,20 @@ function patchElementHook(element: HTMLElement) {
     }
     if (result) {
         console.log("====执行字符串", result)
+        const haveRegister = elementDataStore.hasStoreData(targetWindow)
+        if(!haveRegister) {
+            // @ts-ignore
+            const currentWujieName = targetWindow.__WUJIE.name
+            const targetWindowPath = `__WUJIE_${targetToLNU(currentWujieName)}`
+            console.log("===存储路径", targetWindowPath)
+            // @ts-ignore
+            window[targetWindowPath] = targetWindow
+            elementDataStore.setStoreData(targetWindow, targetWindowPath)
+        }
+        const targetWindowPath = elementDataStore.getStoreData(targetWindow)
         element.setAttribute('onclick', `(function(window) {
             ${result}
-        })(window.__WUJIE.proxy)`)
+        })(window.${targetWindowPath})`)
         console.log("===替换之后的结果", element.getAttribute('onclick'))
     }
 }
