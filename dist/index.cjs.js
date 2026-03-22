@@ -6284,6 +6284,26 @@ function simple(node, visitors, baseVisitor, state, override) {
   })(node, state, override);
 }
 
+// A recursive walk is one where your functions override the default
+// walkers. They can modify and replace the state parameter that's
+// threaded through the walk, and can opt how and whether to walk
+// their child nodes (by calling their third argument on these
+// nodes).
+function recursive(node, state, funcs, baseVisitor, override) {
+  var visitor = funcs ? make(funcs, undefined) : baseVisitor
+  ;(function c(node, st, override) {
+    visitor[override || node.type](node, st, c);
+  })(node, state, override);
+}
+
+// Used to create a custom walker. Will fill in all missing node
+// type properties with the defaults.
+function make(funcs, baseVisitor) {
+  var visitor = Object.create(baseVisitor || base);
+  for (var type in funcs) { visitor[type] = funcs[type]; }
+  return visitor
+}
+
 function skipThrough(node, st, c) { c(node, st); }
 function ignore(_node, _st, _c) {}
 
@@ -6619,39 +6639,6 @@ function findIdentifiers(code) {
             if (!callee)
                 return;
             getCallExpression(callee, node.arguments, results);
-            // if (callee.type === "Identifier") {
-            //   results.add({
-            //     ast: callee.name,
-            //     start: callee.start,
-            //     end: callee.end,
-            //   });
-            //   if (Array.isArray(node.arguments) && node.arguments.length > 0) {
-            //     node.arguments.forEach((node: any) => {
-            //       if (node.type === 'Identifier') {
-            //         results.add({
-            //           ast: node.name,
-            //           start: node.start,
-            //           end: node.end,
-            //         });
-            //       } else if (node.type === 'MemberExpression') {
-            //         const memberName = getMemberExpressionPath(callee);
-            //         results.add({
-            //           ast: memberName,
-            //           start: node.start,
-            //           end: node.end,
-            //         });
-            //       }
-            //     })
-            //   }
-            // }
-            // if (callee.type === "MemberExpression") {
-            //   const memberName = getMemberExpressionPath(callee);
-            //   results.add({
-            //     ast: memberName,
-            //     start: callee.start,
-            //     end: callee.end,
-            //   });
-            // }
         },
         AssignmentExpression(node) {
             const left = node.left;
@@ -6675,6 +6662,103 @@ function findIdentifiers(code) {
         },
     });
     return Array.from(results).sort((a, b) => a.start - b.start);
+}
+/** 从解构等 Pattern 中收集绑定名（仅用于变量声明左侧） */
+function collectPatternBindingIds(id, results) {
+    if (!id)
+        return;
+    // 普通声明：let a、const foo = 1、var bar
+    if (id.type === "Identifier") {
+        results.push({ ast: id.name, start: id.start, end: id.end });
+        return;
+    }
+    // 对象解构左侧：const { x, y: z, ...rest } = obj
+    if (id.type === "ObjectPattern") {
+        for (const prop of id.properties) {
+            if (prop.type === "Property") {
+                collectPatternBindingIds(prop.value, results);
+            }
+            else if (prop.type === "RestElement") {
+                collectPatternBindingIds(prop.argument, results);
+            }
+        }
+        return;
+    }
+    // 数组解构左侧：const [a, b, , c] = arr
+    if (id.type === "ArrayPattern") {
+        for (const elt of id.elements) {
+            if (elt)
+                collectPatternBindingIds(elt, results);
+        }
+        return;
+    }
+    // 带默认值的解构项：const { x = 1 } = o 或 const [a = 0] = arr
+    if (id.type === "AssignmentPattern") {
+        collectPatternBindingIds(id.left, results);
+    }
+    // 剩余合并项解构赋值：const { ...rest } = o、const [a, ...tail] = arr
+    if (id.type === "RestElement") {
+        collectPatternBindingIds(id.argument, results);
+    }
+}
+/**
+ * 匹配会在全局（如浏览器 window）上产生「命名绑定」的写法（仅**脚本顶层**，不含嵌套函数体内）：
+ * - 顶层函数声明名（如 `function onclick`）
+ * - 顶层 var/let/const（含解构左侧）
+ * - 顶层对裸标识符的简单赋值 `id = ...`
+ *
+ * 不包含：函数体内的声明、成员赋值 `a.b =`、复合赋值等。
+ */
+function findDeclarationIdentifiers(code) {
+    const state = {
+        functionDepth: 0,
+        results: [],
+    };
+    const ast = parse(code, {
+        ecmaVersion: "latest",
+        sourceType: "module",
+        ranges: true,
+    });
+    const visitors = make({
+        Function(node, st, c) {
+            if (node.type === "FunctionDeclaration" &&
+                node.id &&
+                st.functionDepth === 0) {
+                st.results.push({
+                    ast: node.id.name,
+                    start: node.id.start,
+                    end: node.id.end,
+                });
+            }
+            st.functionDepth++;
+            base.Function(node, st, c);
+            st.functionDepth--;
+        },
+        VariableDeclaration(node, st, c) {
+            if (st.functionDepth === 0) {
+                for (const decl of node.declarations) {
+                    collectPatternBindingIds(decl.id, st.results);
+                }
+            }
+            base.VariableDeclaration(node, st, c);
+        },
+        AssignmentExpression(node, st, c) {
+            if (st.functionDepth === 0 &&
+                node.operator === "=" &&
+                node.left?.type === "Identifier") {
+                st.results.push({
+                    ast: node.left.name,
+                    start: node.left.start,
+                    end: node.left.end,
+                });
+            }
+            base.AssignmentExpression(node, st, c);
+        },
+    }, base);
+    recursive(ast, state, visitors);
+    return state.results.reduce((pv, { ast }) => {
+        return `${pv}window.${ast}=${ast};`;
+    }, "");
 }
 
 const store = new WeakMap();
@@ -6706,11 +6790,11 @@ function dealAttributesOCPatch(targetString) {
         }
     });
     replaceAttributeEventStr += `${targetString.slice(lastSliceEnd)}`;
-    console.log("====事件函数处理后字符", replaceAttributeEventStr);
+    // console.log("====事件函数处理后字符", replaceAttributeEventStr)
     return replaceAttributeEventStr;
 }
 function dealHTMLOCPatch(targetString) {
-    console.log("====事件函数原字符", targetString);
+    // console.log("====事件函数原字符", targetString)
     const targetAttrLists = findIdentifiers(targetString);
     let lastSliceEnd = 0;
     let replaceHTMLClickEventStr = '';
@@ -6722,7 +6806,7 @@ function dealHTMLOCPatch(targetString) {
         }
     });
     replaceHTMLClickEventStr += `${targetString.slice(lastSliceEnd)}`;
-    console.log("====事件函数处理后字符", replaceHTMLClickEventStr);
+    // console.log("====事件函数处理后字符", replaceHTMLClickEventStr)
     const fnBodyStr = replaceHTMLClickEventStr.match(fnBody)?.[1];
     return fnBodyStr || '';
 }
@@ -6730,10 +6814,10 @@ function patchElementHook(element, targetWindow) {
     const targetHaveGetAttribute = typeof element.getAttribute === 'function';
     const originHTMLClickEvent = element.onclick;
     const originAttributeEventStr = targetHaveGetAttribute ? element.getAttribute('onclick') : '';
-    if (targetHaveGetAttribute && element.getAttribute('data-test-scope')) {
-        console.log('===HTML事件绑定', originHTMLClickEvent);
-        console.log('===attribute获取事件', originAttributeEventStr);
-    }
+    // if (targetHaveGetAttribute && element.getAttribute('data-test-scope')) {
+    //     console.log('===HTML事件绑定', originHTMLClickEvent)
+    //     console.log('===attribute获取事件', originAttributeEventStr)
+    // }
     let result = '';
     if (originAttributeEventStr) {
         result = dealAttributesOCPatch(originAttributeEventStr);
@@ -6742,13 +6826,13 @@ function patchElementHook(element, targetWindow) {
         result = dealHTMLOCPatch(originHTMLClickEvent.toString());
     }
     if (result) {
-        console.log("====执行字符串", result);
+        // console.log("====执行字符串", result)
         const haveRegister = elementDataStore.hasStoreData(targetWindow);
         if (!haveRegister) {
             // @ts-ignore
             const currentWujieName = targetWindow.__WUJIE.id;
             const targetWindowPath = `__WUJIE_${targetToLNU(currentWujieName)}`;
-            console.log("===存储路径", targetWindowPath);
+            // console.log("===存储路径", targetWindowPath)
             // @ts-ignore
             window[targetWindowPath] = targetWindow;
             elementDataStore.setStoreData(targetWindow, targetWindowPath);
@@ -6757,11 +6841,17 @@ function patchElementHook(element, targetWindow) {
         element.setAttribute('onclick', `(function(window) {
             ${result}
         })(window.${targetWindowPath})`);
-        console.log("===替换之后的结果", element.getAttribute('onclick'));
+        // console.log("===替换之后的结果", element.getAttribute('onclick'))
     }
 }
+function patchInlineCodeHook(code, targetWindow) {
+    const result = findDeclarationIdentifiers(code);
+    console.log("===处理后的信息", result);
+    return result;
+}
 var index = {
-    patchElementHook
+    patchElementHook,
+    patchInlineCodeHook
 };
 
 module.exports = index;
